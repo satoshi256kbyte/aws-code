@@ -1,0 +1,28 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: nesting stack 
+
+Resources:
+
+  VPC:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: vpc.yaml
+      Parameters:
+        TagName : "VPC"
+  
+  FTP:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ftp.yaml
+      Parameters:
+        VPC: !GetAtt VPC.Outputs.VPCID
+        PublicSubnet: !GetAtt VPC.Outputs.PublicSubnet1
+
+  WEB:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: web.yaml
+      Parameters:
+        VPC: !GetAtt VPC.Outputs.VPCID
+        ProtectedSubnet1: !GetAtt VPC.Outputs.ProtectedSubnet1        
+        ProtectedSubnet2: !GetAtt VPC.Outputs.ProtectedSubnet2                

@@ -1,0 +1,114 @@
+# https://dev.classmethod.jp/articles/cloudformation-nested-ec2/
+
+Description: FTP Server
+
+Parameters:
+  EnvironmentName:
+    Description: An environment name that is prefixed to resource names
+    Type: String
+
+  VPC:
+    Description: VPC ID
+    Type: AWS::EC2::VPC::Id
+    ConstraintDescription: must be a valid VPC ID
+
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+
+  FtpImageId:
+    Description: AMI ID
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+
+  FtpInstanceType:
+    Description: Ftp Server EC2 instance type
+    Type: String
+    Default: t3.nano
+    AllowedValues:
+      - t3.nano
+      - t3.micro
+      - t3.small
+    ConstraintDescription: must be a valid EC2 instance type.
+
+  FtpSubnet:
+    Description: Public subnet
+    Type: AWS::EC2::Subnet::Id
+    ConstraintDescription: musb be a valid subnet ID.
+
+Resources:
+  FTPRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      RoleName: !Sub ${EnvironmentName}-iamrole-ftp
+      Description: FTP role
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      MaxSessionDuration: 3600
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-iamrole-ftp
+
+  FTPInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref FTPRole
+
+  FTPInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref FtpInstanceType
+      KeyName: !Ref KeyName
+      ImageId: !Ref FtpImageId
+      IamInstanceProfile: !Ref FTPInstanceProfile
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: "0"
+          SubnetId: !Ref FtpSubnet
+          GroupSet:
+            - !Ref FTPSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-ec2-ftp
+      UserData: !Base64
+        Fn::Sub: |
+          #cloud-config
+          repo_update: true
+          repo_upgrade: all
+          packages:
+            - vsftpd
+          runcmd:
+            - systemctl enable amazon-ssm-agent
+            - sustemctl enable vsftpd
+
+  FTPSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${EnvironmentName}-sg-ftp
+      GroupDescription: FTP security group
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 21
+          ToPort: 21
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 60000
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-sg-ftp

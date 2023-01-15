@@ -1,0 +1,126 @@
+
+AWSTemplateFormatVersion: "2010-09-09"
+Parameters:
+  ProjectName:
+    Description: Project name
+    Type: String
+  EnvironmentName:
+    Description: Environment name
+    Type: String
+    Default: STG
+    AllowedValues:
+      - STG
+      - PRD
+Resources:
+# ------------------------------------------------------------#
+# DynamoDB
+# 参考
+# https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/gettingstarted.templatebasics.html
+# ------------------------------------------------------------#
+  DynamoDBTable: 
+    Type: AWS::DynamoDB::Table
+    Properties: 
+      TableName: !Sub ${ProjectName}-${EnvironmentName}-DynamoDB-Table
+      AttributeDefinitions: 
+        - 
+          AttributeName: "Album"
+          AttributeType: "S"
+        - 
+          AttributeName: "Artist"
+          AttributeType: "S"
+      KeySchema: 
+        - 
+          AttributeName: "Album"
+          KeyType: "HASH"
+        - 
+          AttributeName: "Artist"
+          KeyType: "RANGE"
+      ProvisionedThroughput: 
+        ReadCapacityUnits: "5"
+        WriteCapacityUnits: "5"
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName          
+        - Key: Backup
+          Value: !Sub ${ProjectName}-${EnvironmentName}-DynamoDB-Backup
+# ------------------------------------------------------------#
+# DynamoDB Alarm
+# 参考
+# https://dev.classmethod.jp/articles/dynamodb-streams-cloudwatch-alarm-by-cloudformation/
+# https://stackoverflow.com/questions/48284839/aws-cloudformation-dynamodb-alarms
+# ------------------------------------------------------------#
+  DynamoDBAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${ProjectName}-${EnvironmentName}-DynamoDB-Write-Capacity-Alarm
+      Namespace: AWS/DynamoDB
+      ComparisonOperator: GreaterThanOrEqualToThreshold 
+      Dimensions:
+        - Name: TableName
+          Value: !Ref DynamoDBTable
+      EvaluationPeriods: 1
+      MetricName: ConsumedWriteCapacityUnits
+      Period: 300
+      Statistic: Average
+      Threshold: 1
+
+
+# ------------------------------------------------------------#
+# Backup Execution Role (IAM)
+# ------------------------------------------------------------#
+  DynamoDBBackupExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-Backup-Role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: Allow
+          Action: sts:AssumeRole
+          Principal:
+            Service: backup.amazonaws.com
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup
+        - arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForRestores
+      Path: "/service-role/"
+
+# ------------------------------------------------------------#
+# Backup
+# https://blog.usize-tech.com/backup-dynamodb-by-awsbackup/
+# ------------------------------------------------------------#
+  DynamoDBBackupVault:
+    Type: AWS::Backup::BackupVault
+    Properties:
+      BackupVaultName: !Sub ${ProjectName}-Backup-Vault
+      BackupVaultTags:
+        Cost: !Ref ProjectName
+
+  DynamoDBBackupPlan:
+    Type: AWS::Backup::BackupPlan
+    Properties:
+      BackupPlan:
+        BackupPlanName: !Sub ${ProjectName}-Backup-Plan
+        BackupPlanRule:
+          - RuleName: RuleForDailyBackups
+            TargetBackupVault: !Ref DynamoDBBackupVault
+            ScheduleExpression: "cron(0 22 ? * * *)"
+            Lifecycle:
+              DeleteAfterDays: 7
+      BackupPlanTags:
+        Cost: !Ref ProjectName
+  # 指定のタグを持つリソースをAWS Backupで取得する
+  # 参考
+  # https://dev.classmethod.jp/articles/aws_backup_tagon/
+  DynamoDBTagBasedBackupSelection:
+    Type: AWS::Backup::BackupSelection
+    Properties:
+      BackupPlanId: !Ref DynamoDBBackupPlan
+      BackupSelection:
+        SelectionName: !Sub ${ProjectName}-${ProjectName}-Backup-Selection
+        IamRoleArn: !GetAtt DynamoDBBackupExecutionRole.Arn
+        ListOfTags:
+         - ConditionType: STRINGEQUALS
+           ConditionKey: Backup
+           ConditionValue: !Sub Backup-${ProjectName}
