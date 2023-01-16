@@ -73,7 +73,7 @@ Resources:
   DynamoDBBackupExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub ${ProjectName}-Backup-Role
+      RoleName: !Sub ${ProjectName}-${EnvironmentName}-Backup-Role
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -93,7 +93,7 @@ Resources:
   DynamoDBBackupVault:
     Type: AWS::Backup::BackupVault
     Properties:
-      BackupVaultName: !Sub ${ProjectName}-Backup-Vault
+      BackupVaultName: !Sub ${ProjectName}-${EnvironmentName}-Backup-Vault
       BackupVaultTags:
         Cost: !Ref ProjectName
 
@@ -101,7 +101,7 @@ Resources:
     Type: AWS::Backup::BackupPlan
     Properties:
       BackupPlan:
-        BackupPlanName: !Sub ${ProjectName}-Backup-Plan
+        BackupPlanName: !Sub ${ProjectName}-${EnvironmentName}-Backup-Plan
         BackupPlanRule:
           - RuleName: RuleForDailyBackups
             TargetBackupVault: !Ref DynamoDBBackupVault
@@ -118,7 +118,7 @@ Resources:
     Properties:
       BackupPlanId: !Ref DynamoDBBackupPlan
       BackupSelection:
-        SelectionName: !Sub ${ProjectName}-${ProjectName}-Backup-Selection
+        SelectionName: !Sub ${ProjectName}-${EnvironmentName}-Backup-Selection
         IamRoleArn: !GetAtt DynamoDBBackupExecutionRole.Arn
         ListOfTags:
          - ConditionType: STRINGEQUALS
