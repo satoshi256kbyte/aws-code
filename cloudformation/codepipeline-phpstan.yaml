@@ -1,24 +1,43 @@
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - 
+        Label:
+          default: Parameters for CodePipeline
+        Parameters:
+          - ApplicationName
+          - RepositoryName
+          - BranchName
+      - 
+        Label:
+          default: Parameters for CodeBuild
+        Parameters:
+          - CodeBuildImage
+          - BuildSpecFile
+          - OutputArtifactName
+
 Parameters:
   ApplicationName:
     Description: Application name
     Type: String
     Default: demo-sample
-  BranchName:
-    Description: CodeCommit branch name
-    Type: String
-    Default: main
   RepositoryName:
     Description: CodeComit repository name
     Type: String
     Default: php-sample
+  BranchName:
+    Description: CodeCommit branch name
+    Type: String
+    Default: main
   CodeBuildImage:
     Description: Name of codebuild image to use.
     Type: String
-    Default: 'aws/codebuild/standard:4.0'
+    Default: 'aws/codebuild/amazonlinux2-x86_64-standard:4.0'
   BuildSpecFile:
     Description: Name of buildspec.
     Type: String
-    Default: buildspec-phpstan.yml
+    Default: buildspec.yml
   OutputArtifactName: 
     Description: Name of artifact.  
     Type: String
@@ -216,50 +235,15 @@ Resources:
                   - 'codecommit:GetUploadArchiveStatus'
                   - 'codecommit:UploadArchive'
                 Resource: '*'
-              # - Effect: Allow
-                # Action:
-                #   - 'codedeploy:CreateDeployment'
-                #   - 'codedeploy:GetApplicationRevision'
-                #   - 'codedeploy:GetDeployment'
-                #   - 'codedeploy:GetDeploymentConfig'
-                #   - 'codedeploy:RegisterApplicationRevision'
-                # Resource: '*'
               - Effect: Allow
                 Action:
                   - 'codebuild:BatchGetBuilds'
                   - 'codebuild:StartBuild'
                 Resource: '*'
-              # - Effect: Allow
-              #   Action:
-              #     - 'devicefarm:ListProjects'
-              #     - 'devicefarm:ListDevicePools'
-              #     - 'devicefarm:GetRun'
-              #     - 'devicefarm:GetUpload'
-              #     - 'devicefarm:CreateUpload'
-              #     - 'devicefarm:ScheduleRun'
-              #   Resource: '*'
-              # - Effect: Allow
-              #   Action:
-              #     - 'lambda:InvokeFunction'
-              #     - 'lambda:ListFunctions'
-              #   Resource: '*'
-              # - Effect: Allow
-              #   Action:
-              #     - 'iam:PassRole'
-              #   Resource: '*'
               - Effect: Allow
                 Action:
-                  # - 'elasticbeanstalk:*'
-                  # - 'ec2:*'
-                  # - 'elasticloadbalancing:*'
-                  # - 'autoscaling:*'
                   - 'cloudwatch:*'
                   - 's3:*'
-                  # - 'sns:*'
-                  # - 'cloudformation:*'
-                  # - 'rds:*'
-                  # - 'sqs:*'
-                  # - 'ecs:*'
                 Resource: '*'
   CodeBuildServiceRole:
     Type: 'AWS::IAM::Role'
