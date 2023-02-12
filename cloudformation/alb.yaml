@@ -1,0 +1,128 @@
+Description:
+  ALB
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - 
+        Label:
+          default: Common parameters
+        Parameters:
+          - ProjectName
+          - EnvironmentName
+
+Parameters:
+  ProjectName:
+    Description: An project name that is prefixed to resource names
+    Type: String
+  EnvironmentName:
+    Description: An environment name that is prefixed to resource names
+    Type: String
+    Default: DEV
+    AllowedValues:
+      - DEV
+      - STG
+      - PRD
+  
+Resources:
+# ------------------------------------------------------------#
+#  Target Group
+# ------------------------------------------------------------#
+  TargetGroup: 
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties: 
+      VpcId: !ImportValue
+        'Fn::Sub': '${ProjectName}-${EnvironmentName}-vpc'
+      Name: !Sub ${ProjectName}-${EnvironmentName}-tg
+      Protocol: HTTP
+      Port: 80
+      HealthCheckProtocol: HTTP
+      HealthCheckPath: /
+      HealthCheckPort: traffic-port
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+      HealthCheckTimeoutSeconds: 5
+      HealthCheckIntervalSeconds: 10
+      Matcher: 
+        HttpCode: 200
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref EnvironmentName      
+        - Key: Name
+          Value: !Sub ${ProjectName}-${EnvironmentName}-tg
+      TargetGroupAttributes: 
+        - Key: deregistration_delay.timeout_seconds
+          Value: 300
+        - Key: stickiness.enabled
+          Value: false
+        - Key: stickiness.type
+          Value: lb_cookie
+        - Key: stickiness.lb_cookie.duration_seconds
+          Value: 86400
+      Targets: 
+        - Id: !ImportValue
+            'Fn::Sub': '${ProjectName}-${EnvironmentName}-ec2-web-1'
+          Port: 80
+        - Id: !ImportValue
+            'Fn::Sub': '${ProjectName}-${EnvironmentName}-ec2-web-2'
+          Port: 80          
+# ------------------------------------------------------------#
+#  Internet ALB
+# ------------------------------------------------------------#
+  InternetALB: 
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties: 
+      Name: !Sub ${ProjectName}-${EnvironmentName}-alb
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub ${ProjectName}-${EnvironmentName}-alb
+      Scheme: internet-facing
+      LoadBalancerAttributes: 
+        - Key: deletion_protection.enabled
+          Value: false
+        - Key: idle_timeout.timeout_seconds
+          Value: 60
+      SecurityGroups:
+        - !Ref ALBSecurityGroup
+      Subnets: 
+        - !ImportValue
+          'Fn::Sub': '${ProjectName}-${EnvironmentName}-public-subnet-1'
+        - !ImportValue
+          'Fn::Sub': '${ProjectName}-${EnvironmentName}-public-subnet-2'
+
+  ALBListener: 
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties: 
+      DefaultActions: 
+        - TargetGroupArn: !Ref TargetGroup
+          Type: forward
+      LoadBalancerArn: !Ref InternetALB
+      Port: 80
+      Protocol: HTTP
+# ------------------------------------------------------------#
+#  SecurityGroup
+# ------------------------------------------------------------#
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ALB Security Group
+      VpcId: !ImportValue
+        'Fn::Sub': '${ProjectName}-${EnvironmentName}-vpc'      
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub ${ProjectName}-${EnvironmentName}-sg-alb
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: '0.0.0.0/0'

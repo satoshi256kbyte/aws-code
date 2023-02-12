@@ -1,0 +1,101 @@
+Description:
+  Maintenance
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - 
+        Label:
+          default: Common parameters
+        Parameters:
+          - ProjectName
+          - EnvironmentName
+      - 
+        Label:
+          default: Load balancer listener
+        Parameters:
+          - ListenerArn
+
+Parameters:
+  ProjectName:
+    Description: An project name that is prefixed to resource names
+    Type: String
+  EnvironmentName:
+    Description: An environment name that is prefixed to resource names
+    Type: String
+    Default: DEV
+    AllowedValues:
+      - DEV
+      - STG
+      - PRD
+  ListenerArn:
+    Description: ARN of ALB Listener
+    Type: String 
+
+Resources:
+  MaintenanceListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - Type: fixed-response
+          FixedResponseConfig:
+            ContentType: 'text/html'
+            MessageBody: |
+              <html>
+              <head>
+              <meta charset="utf-8">
+              <title>Maintenance</title>
+              <style>
+                  html{
+                      margin: 0;
+                      padding: 0;
+                      text-align: center;
+                      height: 100%;
+                  }
+                  body{
+                      position: relative;
+                      height: 100%;
+                      background: #eee;
+                  }
+                  div{
+                      position: absolute;
+                      left: 50%;
+                      top: 30%;
+                      margin-left: -300px;
+                      width: 600px;
+                      border: 2px solid #666;
+                      padding: 64px 32px;
+                      box-sizing: border-box;
+                      background: #fff;
+                      text-align: center;
+                  }   
+                  .message{
+                      font-size: 34px;
+                      margin-bottom: 24px;
+                      font-weight: bold;
+                  }
+                  .date{
+                      color: #fff;
+                      padding: 8px;
+                      background: #cc0000;
+                      width: 90%;
+                      margin: 0 auto 16px;
+                  }
+              </style>
+              </head>
+              <body>
+              <div>
+                  <p class="message">ただいまメンテナンス中です</p>
+                  <p class="date">【メンテナンス日時】2020年12月12日 2:00～7:00</p>
+                  <p>ご利用の皆様にはご迷惑をおかけし、大変申し訳ございません。<br>
+                  メンテナンス終了までしばらくお待ちください。</p>
+              </div>
+              </body>
+              </html>
+            StatusCode: 503
+      Conditions:
+        - Field: path-pattern
+          Values: 
+            - '*'
+      ListenerArn: !Ref ListenerArn
+      Priority: 1

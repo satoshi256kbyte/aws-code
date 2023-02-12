@@ -1,0 +1,176 @@
+Description:
+  WEB Server
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - 
+        Label:
+          default: Common parameters
+        Parameters:
+          - ProjectName
+          - EnvironmentName
+      - 
+        Label:
+          default: Parameters for EC2
+        Parameters:
+          - KeyPairName
+          - ImageId
+          - InstanceType
+
+Parameters:
+  ProjectName:
+    Description: An project name that is prefixed to resource names
+    Type: String
+  EnvironmentName:
+    Description: An environment name that is prefixed to resource names
+    Type: String
+    Default: DEV
+    AllowedValues:
+      - DEV
+      - STG
+      - PRD
+  KeyPairName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+  Ec2ImageId:
+    Description: AMI ID
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+  Ec2InstanceType:
+    Description: WebServer EC2 instance type
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t2.medium
+      - t2.large
+    ConstraintDescription: must be a valid EC2 instance type.
+
+Resources:
+  WEBIAMRole: 
+    Type: AWS::IAM::Role
+    Properties: 
+      RoleName: !Sub ${ProjectName}-${EnvironmentName}-role-web
+      AssumeRolePolicyDocument: 
+        Version: '2012-10-17'
+        Statement: 
+          - Effect: Allow
+            Principal: 
+              Service: 
+                - ec2.amazonaws.com
+            Action: 
+              - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+  WEBInstanceProfile: 
+    Type: AWS::IAM::InstanceProfile
+    Properties: 
+      Path: /
+      Roles: 
+        - !Ref WEBIAMRole
+      InstanceProfileName: !Sub ${ProjectName}-${EnvironmentName}-profile-web
+  WEBInstance1:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref Ec2InstanceType
+      SubnetId: !ImportValue
+        'Fn::Sub': '${ProjectName}-${EnvironmentName}-public-subnet-1'
+      ImageId: !Ref Ec2ImageId
+      SecurityGroupIds:
+        - !Ref WEBSecurityGroup
+      IamInstanceProfile: !Ref WEBInstanceProfile
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: 100
+            VolumeType: gp3
+      EbsOptimized: false
+      SourceDestCheck: false
+      KeyName: !Ref KeyPairName
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub ${ProjectName}-${EnvironmentName}-ec2-web-1
+      UserData: !Base64
+        Fn::Sub: |
+          #!/bin/bash -xe
+          yum update -y
+          yum install -y httpd
+          systemctl start httpd
+          systemctl enable httpd
+
+  WEBInstance2:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref Ec2InstanceType
+      SubnetId: !ImportValue
+        'Fn::Sub': '${ProjectName}-${EnvironmentName}-public-subnet-2'
+      ImageId: !Ref Ec2ImageId
+      SecurityGroupIds:
+        - !Ref WEBSecurityGroup
+      IamInstanceProfile: !Ref WEBInstanceProfile
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: 100
+            VolumeType: gp3
+      EbsOptimized: false
+      SourceDestCheck: false
+      KeyName: !Ref KeyPairName
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref EnvironmentName      
+        - Key: Name
+          Value: !Sub ${ProjectName}-${EnvironmentName}-ec2-web-2
+      UserData: !Base64
+        Fn::Sub: |
+          #!/bin/bash -xe
+          yum update -y
+          yum install -y httpd
+          systemctl start httpd
+          systemctl enable httpd
+
+  WEBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: WEB Security Group
+      VpcId: !ImportValue
+        'Fn::Sub': '${ProjectName}-${EnvironmentName}-vpc'
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub ${ProjectName}-${EnvironmentName}-sg-web
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: '0.0.0.0/0'
+
+Outputs:
+  WEBInstance1:
+    Description: WEB server No. 1
+    Value: !Ref WEBInstance1
+    Export:
+      Name: !Sub ${ProjectName}-${EnvironmentName}-ec2-web-1
+  WEBInstance2:
+    Description: WEB server No. 2
+    Value: !Ref WEBInstance2
+    Export:
+      Name: !Sub ${ProjectName}-${EnvironmentName}-ec2-web-2
+  WEBSecurityGroup:
+    Description: Security group for web server
+    Value: !Ref WEBSecurityGroup
+    Export:
+      Name: !Sub ${ProjectName}-${EnvironmentName}-sg-web
