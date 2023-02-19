@@ -1,0 +1,28 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Basic authentication functions for CloudFront
+
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    Timeout: 3
+    MemorySize: 128
+
+Resources:
+  CloudFrontBasicAuthFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: src/
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      Architectures:
+        - x86_64
+
+Outputs:
+  CloudFrontBasicAuthFunction:
+    Description: "Basic authentication Lambda function ARN"
+    Value: !GetAtt CloudFrontBasicAuthFunction.Arn
+  CloudFrontBasicAuthFunctionIamRole:
+    Description: "Implicit IAM Role created for Basic authentication function"
+    Value: !GetAtt CloudFrontBasicAuthFunctionRole.Arn
