@@ -4,9 +4,11 @@ phases:
     runtime-versions:
       php: 8.1
     commands:
+        - yum install -y pcre2-tools
         - composer install --working-dir=./
   pre_build:
     commands:
+      - sh ./concealing_exceptions.sh 
       - composer stan --working-dir=./
   #build: 
   #  commands: 

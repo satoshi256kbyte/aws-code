@@ -41,4 +41,13 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
     ];
+
+    protected function _sample()
+    {
+        try {
+            $this->name = 'sample';
+        } catch (\Throwable $th) {
+            throw $th;
+        }
+    }
 }
